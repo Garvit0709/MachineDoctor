@@ -1,0 +1,211 @@
+{
+  "project": "MachineDoctor",
+  "algorithm": "AURA",
+  "experiment": "B010",
+  "created_utc": "2026-11-19T11:39:42.282362+00:00",
+  "dataset_scope": "Synthetic experiments and exploratory CWRU real-recording analysis",
+  "novelty_verified": false,
+  "experiments": [
+    {
+      "experiment": "B001",
+      "file": "baseline_predictions.csv",
+      "status": "available",
+      "rows": 540,
+      "columns": [
+        "mean",
+        "std",
+        "rms",
+        "peak",
+        "peak_to_peak",
+        "crest_factor",
+        "kurtosis",
+        "dominant_frequency",
+        "spectral_centroid",
+        "condition",
+        "run_id",
+        "rpm",
+        "prediction",
+        "anomaly_score",
+        "actual"
+      ]
+    },
+    {
+      "experiment": "B002",
+      "file": "condition_aware_predictions.csv",
+      "status": "available",
+      "rows": 540,
+      "columns": [
+        "mean",
+        "std",
+        "rms",
+        "peak",
+        "peak_to_peak",
+        "crest_factor",
+        "kurtosis",
+        "dominant_frequency",
+        "spectral_centroid",
+        "rpm",
+        "condition",
+        "run_id",
+        "prediction",
+        "anomaly_score",
+        "actual"
+      ]
+    },
+    {
+      "experiment": "B003",
+      "file": "b003_extended.csv",
+      "status": "available",
+      "rows": 540,
+      "columns": [
+        "mean",
+        "std",
+        "rms",
+        "peak",
+        "peak_to_peak",
+        "crest_factor",
+        "kurtosis",
+        "dominant_frequency",
+        "spectral_centroid",
+        "rpm",
+        "rpm_range",
+        "rpm_acceleration",
+        "condition",
+        "run_id",
+        "prediction"
+      ]
+    },
+    {
+      "experiment": "B004",
+      "file": "b004_acceleration_aware.csv",
+      "status": "available",
+      "rows": 2160,
+      "columns": [
+        "mean",
+        "std",
+        "rms",
+        "peak",
+        "peak_to_peak",
+        "crest_factor",
+        "kurtosis",
+        "dominant_frequency",
+        "spectral_centroid",
+        "rpm",
+        "rpm_acceleration",
+        "condition",
+        "profile",
+        "run_id",
+        "prediction",
+        "anomaly_score"
+      ]
+    },
+    {
+      "experiment": "B005",
+      "file": "b005_early_warning.csv",
+      "status": "available",
+      "rows": 760,
+      "columns": [
+        "mean",
+        "std",
+        "rms",
+        "peak",
+        "peak_to_peak",
+        "crest_factor",
+        "kurtosis",
+        "dominant_frequency",
+        "spectral_centroid",
+        "rpm",
+        "rpm_acceleration",
+        "time_start",
+        "time_end",
+        "severity",
+        "run_id",
+        "anomaly_score",
+        "prediction",
+        "profile",
+        "seed"
+      ]
+    },
+    {
+      "experiment": "B006",
+      "file": "b006_sequential_results.csv",
+      "status": "available",
+      "rows": 3040,
+      "columns": [
+        "mean",
+        "std",
+        "rms",
+        "peak",
+        "peak_to_peak",
+        "crest_factor",
+        "kurtosis",
+        "dominant_frequency",
+        "spectral_centroid",
+        "rpm",
+        "rpm_acceleration",
+        "time_start",
+        "time_end",
+        "run_id",
+        "score",
+        "profile",
+        "alert",
+        "method"
+      ]
+    },
+    {
+      "experiment": "B007",
+      "file": "b007_calibrated_results.csv",
+      "status": "available",
+      "rows": 120,
+      "columns": [
+        "run_id",
+        "profile",
+        "method",
+        "parameter",
+        "false_alarm",
+        "detected",
+        "delay"
+      ]
+    },
+    {
+      "experiment": "B008",
+      "file": "b008_robustness_results.csv",
+      "status": "available",
+      "rows": 300,
+      "columns": [
+        "scenario",
+        "method",
+        "seed",
+        "false_alarm",
+        "detected",
+        "delay"
+      ]
+    },
+    {
+      "experiment": "B009",
+      "file": "b009_real_anomaly_results.csv",
+      "status": "available",
+      "rows": 100,
+      "columns": [
+        "mean",
+        "std",
+        "rms",
+        "peak",
+        "peak_to_peak",
+        "crest_factor",
+        "kurtosis",
+        "dominant_frequency",
+        "spectral_centroid",
+        "file_id",
+        "condition",
+        "load_hp",
+        "rpm",
+        "window_start_s",
+        "prediction",
+        "anomaly_score",
+        "actual",
+        "experiment"
+      ]
+    }
+  ]
+}
