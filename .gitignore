@@ -1,0 +1,15 @@
+# Python environment
+.venv/
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Generated datasets and results
+data/generated/
+results/generated/
+
+# Local settings
+.env
+.vscode/
