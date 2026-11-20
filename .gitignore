@@ -13,3 +13,17 @@ results/generated/
 # Local settings
 .env
 .vscode/
+# Research datasets
+data/raw/
+data/generated/
+
+# Generated experimental results
+results/generated/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local configuration
+.env
