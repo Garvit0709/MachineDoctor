@@ -1,3 +1,4 @@
+import AURAIntelligence from './AURAIntelligence'
 import BackendStatus from './BackendStatus'
 import { useState } from 'react'
 import SignalExplorer from './SignalExplorer'
@@ -607,6 +608,7 @@ export default function Dashboard() {
   // --------------------------------------------------
 
   
+
 const renderPage = () => {
   switch (activePage) {
     case 'Overview':
@@ -615,10 +617,14 @@ const renderPage = () => {
     case 'Diagnostics':
       return <SignalExplorer />
 
+    case 'AURA Intelligence':
+      return <AURAIntelligence />
+
     default:
       return renderPlaceholder()
   }
 }
+
 
 
   // --------------------------------------------------
