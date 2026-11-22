@@ -1,5 +1,10 @@
 from fastapi import File, HTTPException, UploadFile
+import io
+import pandas as pd
 
+from backend.aura_contract import AURAInputError
+from backend.aura_inference import diagnose_feature_sequence
+from backend.aura_model_store import AURAModelError
 from backend.signal_processing import (
     MAX_FILE_BYTES,
     SignalValidationError,
@@ -101,6 +106,70 @@ async def analyze_signal(file: UploadFile = File(...)):
         raise HTTPException(
             status_code=422,
             detail=str(exc),
+        ) from exc
+
+    finally:
+        await file.close()
+
+MAX_FEATURE_FILE_BYTES = 2 * 1024 * 1024
+
+
+@app.post("/api/aura/diagnose")
+async def diagnose_aura(
+    file: UploadFile = File(...),
+):
+    """
+    Diagnose one precomputed feature-window CSV.
+
+    Experimental endpoint for local research use.
+    """
+
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Filename is required.",
+        )
+
+    if not file.filename.lower().endswith(".csv"):
+        raise HTTPException(
+            status_code=415,
+            detail="Only CSV files are supported.",
+        )
+
+    try:
+        content = await file.read(
+            MAX_FEATURE_FILE_BYTES + 1
+        )
+
+        if len(content) > MAX_FEATURE_FILE_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail="Feature CSV exceeds 2 MB.",
+            )
+
+        try:
+            features = pd.read_csv(
+                io.BytesIO(content),
+                encoding="utf-8-sig",
+            )
+        except (pd.errors.ParserError, UnicodeError) as exc:
+            raise HTTPException(
+                status_code=422,
+                detail="Unable to parse feature CSV.",
+            ) from exc
+
+        return diagnose_feature_sequence(features)
+
+    except AURAInputError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    except AURAModelError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="AURA model unavailable or invalid.",
         ) from exc
 
     finally:
