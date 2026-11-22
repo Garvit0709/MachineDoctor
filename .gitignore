@@ -27,3 +27,9 @@ __pycache__/
 
 # Local configuration
 .env
+# Trained AURA model artifacts
+models/*.joblib
+models/*.pkl
+
+# Local model metadata
+models/*.json
