@@ -1,6 +1,6 @@
 
 import { useState } from 'react'
-
+import DiagnosticReports from './DiagnosticReports'
 import AURAIntelligence from './AURAIntelligence'
 import BackendStatus from './BackendStatus'
 import LiveOverview from './LiveOverview'
@@ -151,6 +151,9 @@ export default function Dashboard() {
     switch (activePage) {
       case 'Overview':
         return <LiveOverview onNavigate={selectPage} />
+
+        case 'Reports':
+  return <DiagnosticReports />
 
       case 'Motor Registry':
         return <MotorRegistry />
