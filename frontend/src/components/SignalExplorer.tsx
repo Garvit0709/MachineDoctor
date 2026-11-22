@@ -1,7 +1,6 @@
 
-import { useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
-import FFT from 'fft.js'
 
 import {
   Activity,
@@ -9,6 +8,7 @@ import {
   CheckCircle2,
   FileUp,
   Info,
+  LoaderCircle,
   Waves,
 } from 'lucide-react'
 
@@ -22,325 +22,30 @@ import {
   YAxis,
 } from 'recharts'
 
-type Sample = {
-  time: number
-  vibration: number
-  rpm?: number
-}
+import {
+  analyzeSignal,
+} from '../services/signalApi'
 
-type SignalFeatures = {
-  rms: number
-  peak: number
-  peakToPeak: number
-  crestFactor: number
-  kurtosis: number
-  dominantFrequency: number
-}
+import type {
+  SignalAnalysisResponse,
+} from '../services/signalApi'
 
-const MAX_SAMPLES = 200000
-const FFT_SIZE = 4096
 
-function parseCSV(text: string): Sample[] {
-  const lines = text
-    .replace(/^\uFEFF/, '')
-    .trim()
-    .split(/\r?\n/)
-
-  if (lines.length < 3) {
-    throw new Error(
-      'CSV must contain a header and at least two samples.',
-    )
-  }
-
-  const headers = lines[0]
-    .split(',')
-    .map((header) =>
-      header.trim().toLowerCase().replace(/^"|"$/g, ''),
-    )
-
-  const timeIndex = headers.findIndex((header) =>
-    ['time', 'time_s', 'timestamp'].includes(header),
-  )
-
-  const vibrationIndex = headers.findIndex((header) =>
-    ['vibration', 'amplitude', 'signal'].includes(header),
-  )
-
-  const rpmIndex = headers.indexOf('rpm')
-
-  if (timeIndex < 0 || vibrationIndex < 0) {
-    throw new Error(
-      'CSV requires time_s and vibration columns.',
-    )
-  }
-
-  if (lines.length - 1 > MAX_SAMPLES) {
-    throw new Error(
-      `Maximum ${MAX_SAMPLES.toLocaleString()} samples supported.`,
-    )
-  }
-
-  const samples: Sample[] = []
-
-  for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue
-
-    const values = lines[i].split(',')
-
-    const timeValue = values[timeIndex]?.trim()
-    const vibrationValue = values[vibrationIndex]?.trim()
-
-    if (!timeValue || !vibrationValue) {
-      throw new Error(
-        `Missing numerical value at row ${i + 1}.`,
-      )
-    }
-
-    const time = Number(timeValue)
-    const vibration = Number(vibrationValue)
-
-    if (
-      !Number.isFinite(time) ||
-      !Number.isFinite(vibration)
-    ) {
-      throw new Error(
-        `Invalid numerical value at row ${i + 1}.`,
-      )
-    }
-
-    const sample: Sample = {
-      time,
-      vibration,
-    }
-
-    if (rpmIndex >= 0 && values[rpmIndex]?.trim()) {
-      const rpm = Number(values[rpmIndex])
-
-      if (!Number.isFinite(rpm)) {
-        throw new Error(
-          `Invalid RPM at row ${i + 1}.`,
-        )
-      }
-
-      sample.rpm = rpm
-    }
-
-    samples.push(sample)
-  }
-
-  if (samples.length < 2) {
-    throw new Error(
-      'At least two valid samples are required.',
-    )
-  }
-
-  const firstInterval =
-    samples[1].time - samples[0].time
-
-  if (firstInterval <= 0) {
-    throw new Error(
-      'Time values must increase strictly.',
-    )
-  }
-
-  for (let i = 1; i < samples.length; i++) {
-    const interval =
-      samples[i].time - samples[i - 1].time
-
-    if (interval <= 0) {
-      throw new Error(
-        `Time values must increase strictly at row ${i + 2}.`,
-      )
-    }
-
-    const relativeDifference =
-      Math.abs(interval - firstInterval) / firstInterval
-
-    if (relativeDifference > 0.01) {
-      throw new Error(
-        'Sampling intervals are not sufficiently uniform for FFT analysis.',
-      )
-    }
-  }
-
-  return samples
-}
-
-function getSamplingRate(samples: Sample[]): number {
-  const duration =
-    samples[samples.length - 1].time -
-    samples[0].time
-
-  return (samples.length - 1) / duration
-}
-
-function calculateSpectrum(samples: Sample[]) {
-  const n = Math.min(
-    FFT_SIZE,
-    2 ** Math.floor(Math.log2(samples.length)),
-  )
-
-  const samplingRate = getSamplingRate(samples)
-
-  const fft = new FFT(n)
-
-  const input = new Array<number>(n)
-  const output = fft.createComplexArray()
-
-  const values = samples
-    .slice(0, n)
-    .map((sample) => sample.vibration)
-
-  const mean =
-    values.reduce((sum, value) => sum + value, 0) / n
-
-  for (let i = 0; i < n; i++) {
-    const hann =
-      0.5 *
-      (1 - Math.cos((2 * Math.PI * i) / (n - 1)))
-
-    input[i] = (values[i] - mean) * hann
-  }
-
-  fft.realTransform(output, input)
-
-  const spectrum: {
-    frequency: number
-    magnitude: number
-  }[] = []
-
-  for (let i = 0; i <= n / 2; i++) {
-    const re = output[2 * i]
-    const im = output[2 * i + 1]
-
-    spectrum.push({
-      frequency: (i * samplingRate) / n,
-      magnitude: Math.hypot(re, im),
-    })
-  }
-
-  return spectrum
-}
-
-function calculateFeatures(
-  samples: Sample[],
-  spectrum: ReturnType<typeof calculateSpectrum>,
-): SignalFeatures {
-  const n = samples.length
-
-  let sum = 0
-  let sumSquares = 0
-  let peak = 0
-  let minimum = Infinity
-  let maximum = -Infinity
-
-  for (const sample of samples) {
-    const value = sample.vibration
-
-    sum += value
-    sumSquares += value * value
-
-    peak = Math.max(peak, Math.abs(value))
-    minimum = Math.min(minimum, value)
-    maximum = Math.max(maximum, value)
-  }
-
-  const mean = sum / n
-  const rms = Math.sqrt(sumSquares / n)
-
-  let varianceSum = 0
-  let fourthMomentSum = 0
-
-  for (const sample of samples) {
-    const difference = sample.vibration - mean
-
-    varianceSum += difference ** 2
-    fourthMomentSum += difference ** 4
-  }
-
-  const variance = varianceSum / n
-  const fourthMoment = fourthMomentSum / n
-
-  const kurtosis =
-    variance > 1e-20
-      ? fourthMoment / variance ** 2
-      : 0
-
-  const crestFactor =
-    rms > 0 ? peak / rms : 0
-
-  let dominantFrequency = 0
-  let maxMagnitude = -Infinity
-
-  for (const point of spectrum) {
-    if (point.frequency === 0) continue
-
-    if (point.magnitude > maxMagnitude) {
-      maxMagnitude = point.magnitude
-      dominantFrequency = point.frequency
-    }
-  }
-
-  return {
-    rms,
-    peak,
-    peakToPeak: maximum - minimum,
-    crestFactor,
-    kurtosis,
-    dominantFrequency,
-  }
-}
-
-function downsample(
-  samples: Sample[],
-  maxPoints = 1200,
-): Sample[] {
-  const step = Math.max(
-    1,
-    Math.ceil(samples.length / maxPoints),
-  )
-
-  return samples.filter(
-    (_, index) => index % step === 0,
-  )
-}
+const MAX_FILE_BYTES = 12 * 1024 * 1024
 
 export default function SignalExplorer() {
-  const [samples, setSamples] = useState<Sample[]>([])
+  const [analysis, setAnalysis] =
+    useState<SignalAnalysisResponse | null>(null)
+
   const [filename, setFilename] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const spectrum = useMemo(
-    () =>
-      samples.length
-        ? calculateSpectrum(samples)
-        : [],
-    [samples],
-  )
+  const controllerRef = useRef<AbortController | null>(null)
 
-  const features = useMemo(
-    () =>
-      samples.length
-        ? calculateFeatures(samples, spectrum)
-        : null,
-    [samples, spectrum],
-  )
-
-  const waveform = useMemo(
-    () => downsample(samples),
-    [samples],
-  )
-
-  const duration = samples.length
-    ? samples[samples.length - 1].time -
-      samples[0].time
-    : 0
-
-  const samplingRate =
-    samples.length > 1
-      ? getSamplingRate(samples)
-      : 0
+  useEffect(() => {
+    return () => controllerRef.current?.abort()
+  }, [])
 
   async function handleFile(
     event: ChangeEvent<HTMLInputElement>,
@@ -349,34 +54,56 @@ export default function SignalExplorer() {
 
     if (!file) return
 
-    setLoading(true)
-    setError('')
-    setSamples([])
+    controllerRef.current?.abort()
+
+    const controller = new AbortController()
+    controllerRef.current = controller
+
+    setAnalysis(null)
     setFilename('')
+    setError('')
+    setLoading(true)
 
     try {
       if (!file.name.toLowerCase().endsWith('.csv')) {
+        throw new Error('Please select a CSV file.')
+      }
+
+      if (file.size > MAX_FILE_BYTES) {
         throw new Error(
-          'Please select a CSV file.',
+          'File exceeds the 12 MB upload limit.',
         )
       }
 
-      const text = await file.text()
-      const parsed = parseCSV(text)
+      const result = await analyzeSignal(
+        file,
+        controller.signal,
+      )
 
-      setSamples(parsed)
+      if (controller.signal.aborted) return
+
+      setAnalysis(result)
       setFilename(file.name)
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Unable to read CSV file.',
-      )
+      if (!controller.signal.aborted) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Unable to process recording.',
+        )
+      }
     } finally {
-      setLoading(false)
+      if (controllerRef.current === controller) {
+        setLoading(false)
+        controllerRef.current = null
+      }
+
       event.target.value = ''
     }
   }
+
+  const features = analysis?.features
+  const metadata = analysis?.metadata
 
   return (
     <div className="space-y-7">
@@ -386,8 +113,8 @@ export default function SignalExplorer() {
         </h2>
 
         <p className="mt-2 text-sm text-slate-400">
-          Upload and inspect motor-bearing vibration recordings.
-          Browser calculations are exploratory.
+          Upload vibration recordings for Python-based
+          signal processing and frequency analysis.
         </p>
       </div>
 
@@ -399,8 +126,8 @@ export default function SignalExplorer() {
             </h3>
 
             <p className="mt-2 text-xs text-slate-400">
-              Supported CSV columns: time_s, vibration,
-              optional rpm. Maximum 200,000 samples.
+              CSV columns: time_s, vibration, optional rpm.
+              Maximum 12 MB and 200,000 samples.
             </p>
           </div>
 
@@ -418,9 +145,16 @@ export default function SignalExplorer() {
         </div>
 
         {loading && (
-          <p className="mt-4 text-sm text-cyan-300">
-            Processing recording...
-          </p>
+          <div
+            role="status"
+            className="mt-5 flex items-center gap-2 text-sm text-cyan-300"
+          >
+            <LoaderCircle
+              size={18}
+              className="animate-spin"
+            />
+            Processing recording with Python...
+          </div>
         )}
 
         {error && (
@@ -433,29 +167,35 @@ export default function SignalExplorer() {
           </div>
         )}
 
-        {filename && (
+        {analysis && filename && (
           <div className="mt-5 flex items-center gap-2 text-sm text-emerald-300">
             <CheckCircle2 size={18} />
-            Loaded {filename}
+            Processed {filename} using FastAPI
           </div>
         )}
       </section>
 
-      {samples.length > 0 ? (
+      {analysis && metadata && features ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
               [
                 'Samples',
-                samples.length.toLocaleString(),
+                metadata.sample_count.toLocaleString(),
               ],
               [
                 'Duration',
-                `${duration.toFixed(3)} s`,
+                `${metadata.duration_s.toFixed(3)} s`,
               ],
               [
                 'Sampling Rate',
-                `${samplingRate.toFixed(2)} Hz`,
+                `${metadata.sampling_rate_hz.toFixed(2)} Hz`,
+              ],
+              [
+                'Mean RPM',
+                metadata.mean_rpm !== undefined
+                  ? metadata.mean_rpm.toFixed(1)
+                  : 'Not provided',
               ],
             ].map(([label, value]) => (
               <div
@@ -476,18 +216,22 @@ export default function SignalExplorer() {
           <section className="rounded-2xl border border-slate-800 bg-[#111C2D] p-6">
             <div className="mb-5 flex items-center gap-2">
               <Activity className="text-cyan-400" />
-
               <h3 className="font-semibold">
                 Time-Domain Waveform
               </h3>
             </div>
+
+            <p className="mb-4 text-xs text-slate-500">
+              Backend-calculated recording preview.
+              Display points are downsampled.
+            </p>
 
             <div className="h-80">
               <ResponsiveContainer
                 width="100%"
                 height="100%"
               >
-                <LineChart data={waveform}>
+                <LineChart data={analysis.waveform}>
                   <CartesianGrid
                     stroke="#253348"
                     strokeDasharray="3 3"
@@ -502,7 +246,6 @@ export default function SignalExplorer() {
                   />
 
                   <YAxis stroke="#94A3B8" />
-
                   <Tooltip />
 
                   <Line
@@ -528,8 +271,8 @@ export default function SignalExplorer() {
             </div>
 
             <p className="mb-4 text-xs text-slate-500">
-              Hann-windowed FFT of the first analysis
-              segment. Magnitudes are uncalibrated.
+              Hann-windowed FFT calculated by Python.
+              Magnitudes are uncalibrated.
             </p>
 
             <div className="h-80">
@@ -537,7 +280,7 @@ export default function SignalExplorer() {
                 width="100%"
                 height="100%"
               >
-                <LineChart data={spectrum}>
+                <LineChart data={analysis.spectrum}>
                   <CartesianGrid
                     stroke="#253348"
                     strokeDasharray="3 3"
@@ -552,7 +295,6 @@ export default function SignalExplorer() {
                   />
 
                   <YAxis stroke="#94A3B8" />
-
                   <Tooltip />
 
                   <Line
@@ -568,40 +310,42 @@ export default function SignalExplorer() {
             </div>
           </section>
 
-          {features && (
-            <section className="rounded-2xl border border-slate-800 bg-[#111C2D] p-6">
-              <h3 className="mb-5 font-semibold">
-                Extracted Features
-              </h3>
+          <section className="rounded-2xl border border-slate-800 bg-[#111C2D] p-6">
+            <h3 className="mb-5 font-semibold">
+              Python-Extracted Signal Features
+            </h3>
 
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {[
-                  ['RMS', features.rms],
-                  ['Absolute Peak', features.peak],
-                  ['Peak-to-Peak', features.peakToPeak],
-                  ['Crest Factor', features.crestFactor],
-                  ['Pearson Kurtosis', features.kurtosis],
-                  [
-                    'Dominant Frequency (Hz)',
-                    features.dominantFrequency,
-                  ],
-                ].map(([label, value]) => (
-                  <div
-                    key={String(label)}
-                    className="rounded-xl border border-slate-800 bg-[#0B1220] p-4"
-                  >
-                    <p className="text-xs text-slate-400">
-                      {label}
-                    </p>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {[
+                ['RMS', features.rms],
+                ['Absolute Peak', features.absolute_peak],
+                ['Peak-to-Peak', features.peak_to_peak],
+                ['Crest Factor', features.crest_factor],
+                ['Pearson Kurtosis', features.kurtosis],
+                [
+                  'Dominant Frequency (Hz)',
+                  features.dominant_frequency,
+                ],
+                [
+                  'Spectral Centroid (Hz)',
+                  features.spectral_centroid,
+                ],
+              ].map(([label, value]) => (
+                <div
+                  key={String(label)}
+                  className="rounded-xl border border-slate-800 bg-[#0B1220] p-4"
+                >
+                  <p className="text-xs text-slate-400">
+                    {label}
+                  </p>
 
-                    <p className="mt-2 text-xl font-semibold">
-                      {Number(value).toFixed(4)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+                  <p className="mt-2 text-xl font-semibold">
+                    {Number(value).toFixed(4)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
 
           <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-5 text-sm text-cyan-100">
             <Info
@@ -610,29 +354,32 @@ export default function SignalExplorer() {
             />
 
             <p>
-              Signal exploration is available.
-              AURA diagnostic inference will be enabled
-              after FastAPI integration and model
-              configuration validation.
+              Signal processing completed using the
+              MachineDoctor Python backend. AURA diagnostic
+              inference has not been performed on this recording.
+              Diagnostic integration is the next phase.
             </p>
           </div>
         </>
       ) : (
-        <div className="rounded-2xl border border-dashed border-slate-700 p-12 text-center">
-          <Waves
-            className="mx-auto mb-4 text-slate-500"
-            size={38}
-          />
+        !loading && (
+          <div className="rounded-2xl border border-dashed border-slate-700 p-12 text-center">
+            <Waves
+              className="mx-auto mb-4 text-slate-500"
+              size={38}
+            />
 
-          <h3 className="font-semibold">
-            No recording loaded
-          </h3>
+            <h3 className="font-semibold">
+              No recording analyzed
+            </h3>
 
-          <p className="mt-2 text-sm text-slate-400">
-            Upload a vibration CSV to view its waveform,
-            frequency spectrum and statistical features.
-          </p>
-        </div>
+            <p className="mt-2 text-sm text-slate-400">
+              Upload a CSV to process its waveform,
+              frequency spectrum and statistical features
+              using the Python backend.
+            </p>
+          </div>
+        )
       )}
     </div>
   )

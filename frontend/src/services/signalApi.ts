@@ -34,34 +34,62 @@ export type SignalAnalysisResponse = {
   }[]
 }
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  'http://127.0.0.1:8000'
+
 export async function analyzeSignal(
   file: File,
+  signal?: AbortSignal,
 ): Promise<SignalAnalysisResponse> {
   const formData = new FormData()
   formData.append('file', file)
 
   const response = await fetch(
-    'http://127.0.0.1:8000/api/signals/analyze',
+    `${API_BASE_URL}/api/signals/analyze`,
     {
       method: 'POST',
       body: formData,
+      signal,
     },
   )
 
   if (!response.ok) {
-    let message = `Analysis failed (${response.status})`
+    let message = `Signal analysis failed (${response.status})`
 
     try {
-      const error = await response.json()
-      if (typeof error.detail === 'string') {
+      const error: unknown = await response.json()
+
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'detail' in error &&
+        typeof error.detail === 'string'
+      ) {
         message = error.detail
       }
     } catch {
-      // Preserve the HTTP status message.
+      // Keep the HTTP status message.
     }
 
     throw new Error(message)
   }
 
-  return response.json() as Promise<SignalAnalysisResponse>
+  const result: SignalAnalysisResponse =
+    await response.json()
+
+  if (
+    result.status !== 'processed' ||
+    result.aura_inference_performed !== false ||
+    !result.metadata ||
+    !result.features ||
+    !Array.isArray(result.waveform) ||
+    !Array.isArray(result.spectrum)
+  ) {
+    throw new Error(
+      'Unexpected signal analysis response from backend.',
+    )
+  }
+
+  return result
 }
