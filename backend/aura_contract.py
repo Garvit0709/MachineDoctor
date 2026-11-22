@@ -49,7 +49,7 @@ def validate_aura_features(
             "At least three feature windows are required."
         )
 
-    validated = data[REQUIRED_COLUMNS].copy()
+    validated = data.copy()
 
     if validated["run_id"].isna().any():
         raise AURAInputError(

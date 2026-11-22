@@ -1,4 +1,5 @@
 from fastapi import File, HTTPException, UploadFile
+from backend.diagnostic_router import router as diagnostic_router
 import io
 import pandas as pd
 from backend.motor_router import router as motor_router
@@ -24,6 +25,7 @@ app = FastAPI(
     version="0.1.0",
 )
 app.include_router(motor_router)
+app.include_router(diagnostic_router)
 
 # Local development frontend origins only.
 app.add_middleware(

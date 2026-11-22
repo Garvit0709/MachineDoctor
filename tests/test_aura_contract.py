@@ -72,3 +72,12 @@ def test_insufficient_windows():
 
     with pytest.raises(AURAInputError):
         validate_aura_features(data)
+def test_preserves_additional_features():
+    data = valid_data()
+    data["std"] = [0.1, 0.2, 0.3, 0.4]
+    data["peak_to_peak"] = [0.5, 0.6, 0.7, 0.8]
+
+    result = validate_aura_features(data)
+
+    assert "std" in result.columns
+    assert "peak_to_peak" in result.columns

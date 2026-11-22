@@ -4,7 +4,10 @@ from functools import lru_cache
 
 import pandas as pd
 
-from backend.aura_contract import validate_aura_features
+from backend.aura_contract import (
+    AURAInputError,
+    validate_aura_features,
+)
 from backend.aura_model_store import load_aura_model
 
 
@@ -25,17 +28,17 @@ def diagnose_feature_sequence(
     """
     Run AURA on one validated feature sequence.
 
-    AURA v0.1 currently supports compatible
+    This model currently supports compatible
     synthetic motor-bearing feature data only.
     """
 
-    # Step 1: Validate the feature sequence
+    # 1. Validate the incoming feature sequence
     validated = validate_aura_features(features)
 
-    # Step 2: Load the trained model and metadata
+    # 2. Load the trained model and its metadata
     model, metadata = get_aura_model()
 
-    # Step 3: Verify the required feature schema
+    # 3. Check model-specific feature requirements
     required_features = metadata["feature_columns"]
     required_conditions = metadata["condition_columns"]
 
@@ -43,45 +46,61 @@ def diagnose_feature_sequence(
         required_features + required_conditions
     )
 
-    if not required.issubset(validated.columns):
-        raise ValueError(
-            "Feature sequence does not match model schema."
+    missing = sorted(
+        required - set(validated.columns)
+    )
+
+    if missing:
+        raise AURAInputError(
+            "Feature sequence does not match model schema. "
+            f"Missing columns: {missing}"
         )
 
-    # Step 4: Isolate mutable memory for each request
+    # 4. Isolate mutable memory for this request
     request_model = copy.deepcopy(model)
 
-    # Step 5: Run AURA inference
+    # 5. Perform actual AURA inference
     predictions = request_model.predict_sequence(validated)
 
-    # Step 6: Combine input metadata with predictions
+    # 6. Validate expected prediction columns
+    expected_prediction_columns = [
+        "state",
+        "reason",
+        "persistent_score",
+        "instantaneous_score",
+        "uncertainty_distance",
+        "memory_size",
+    ]
+
+    missing_predictions = [
+        column
+        for column in expected_prediction_columns
+        if column not in predictions.columns
+    ]
+
+    if missing_predictions:
+        raise RuntimeError(
+            "AURA model returned an incompatible prediction "
+            f"schema: {missing_predictions}"
+        )
+
+    if len(predictions) != len(validated):
+        raise RuntimeError(
+            "AURA prediction count does not match input windows."
+        )
+
+    # 7. Build the diagnostic output
     output = validated[
         ["run_id", "time_start", "time_end"]
     ].copy()
 
-    output["state"] = predictions["state"].to_numpy()
-    output["reason"] = predictions["reason"].to_numpy()
+    for column in expected_prediction_columns:
+        output[column] = predictions[column].to_numpy()
 
-    output["persistent_score"] = (
-        predictions["persistent_score"].to_numpy()
-    )
-
-    output["instantaneous_score"] = (
-        predictions["instantaneous_score"].to_numpy()
-    )
-
-    output["uncertainty_distance"] = (
-        predictions["uncertainty_distance"].to_numpy()
-    )
-
-    output["memory_size"] = (
-        predictions["memory_size"].to_numpy()
-    )
-
-    # Step 7: Count diagnostic states
+    # 8. Count diagnostic states
     state_counts = output["state"].value_counts()
 
-    # Step 8: Return structured diagnostic results
+    # 9. Return structured results
     return {
         "application": "MachineDoctor",
         "algorithm": "AURA",
