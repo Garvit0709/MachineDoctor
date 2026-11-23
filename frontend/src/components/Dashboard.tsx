@@ -1,13 +1,9 @@
 
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
+
 import { useAuth } from '../auth/useAuth'
 
-import AURAIntelligence from './AURAIntelligence'
 import BackendStatus from './BackendStatus'
-import DiagnosticReports from './DiagnosticReports'
-import LiveOverview from './LiveOverview'
-import MotorRegistry from './MotorRegistry'
-import SignalExplorer from './SignalExplorer'
 
 import {
   Activity,
@@ -25,6 +21,29 @@ import {
   X,
 } from 'lucide-react'
 
+// Lazy-loaded application modules.
+// Each module is loaded when first requested.
+
+const LiveOverview = lazy(
+  () => import('./LiveOverview')
+)
+
+const MotorRegistry = lazy(
+  () => import('./MotorRegistry')
+)
+
+const SignalExplorer = lazy(
+  () => import('./SignalExplorer')
+)
+
+const AURAIntelligence = lazy(
+  () => import('./AURAIntelligence')
+)
+
+const DiagnosticReports = lazy(
+  () => import('./DiagnosticReports')
+)
+
 const navigation = [
   { name: 'Overview', icon: LayoutDashboard },
   { name: 'Motor Registry', icon: Cpu },
@@ -33,6 +52,26 @@ const navigation = [
   { name: 'Reports', icon: FileText },
   { name: 'Settings', icon: Settings },
 ]
+
+// Loading state for lazily loaded modules.
+function ModuleLoading() {
+  return (
+    <div
+      role="status"
+      className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-slate-800 bg-[#111C2D]"
+    >
+      <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-700 border-t-cyan-400" />
+
+      <p className="text-sm font-medium text-slate-300">
+        Loading MachineDoctor module...
+      </p>
+
+      <p className="mt-2 text-xs text-slate-500">
+        Preparing your workspace
+      </p>
+    </div>
+  )
+}
 
 export default function Dashboard() {
   const [activePage, setActivePage] = useState('Overview')
@@ -46,6 +85,7 @@ export default function Dashboard() {
     setMobileOpen(false)
   }
 
+  // Sidebar navigation.
   const renderSidebar = (isCollapsed: boolean) => (
     <>
       {/* Application branding */}
@@ -78,7 +118,7 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Navigation */}
+      {/* Main navigation */}
       <nav
         className="space-y-1 px-3 py-6"
         aria-label="Main navigation"
@@ -104,9 +144,14 @@ export default function Dashboard() {
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
-            <Icon size={19} className="shrink-0" />
+            <Icon
+              size={19}
+              className="shrink-0"
+            />
 
-            {!isCollapsed && <span>{name}</span>}
+            {!isCollapsed && (
+              <span>{name}</span>
+            )}
           </button>
         ))}
       </nav>
@@ -130,7 +175,7 @@ export default function Dashboard() {
     </>
   )
 
-  // Placeholder for future modules
+  // Placeholder for future modules.
   const renderPlaceholder = () => (
     <section className="rounded-2xl border border-slate-800 bg-[#111C2D] p-8">
       <div className="mb-4 flex items-center gap-3">
@@ -147,7 +192,7 @@ export default function Dashboard() {
       <p className="max-w-xl leading-7 text-slate-400">
         This module is part of the MachineDoctor development
         roadmap. Its dedicated functionality will be
-        implemented in the upcoming steps.
+        implemented in upcoming steps.
       </p>
 
       <button
@@ -160,7 +205,7 @@ export default function Dashboard() {
     </section>
   )
 
-  // Dynamic page rendering
+  // Render selected application module.
   const renderPage = () => {
     switch (activePage) {
       case 'Overview':
@@ -274,7 +319,7 @@ export default function Dashboard() {
               RESEARCH PROTOTYPE
             </span>
 
-            {/* Notifications icon */}
+            {/* Notifications */}
             <Bell
               size={20}
               className="hidden text-slate-400 sm:block"
@@ -289,12 +334,15 @@ export default function Dashboard() {
             {/* Administrator avatar */}
             <div
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-sm font-bold text-cyan-300"
-              title={administrator?.username ?? 'Administrator'}
+              title={
+                administrator?.username ??
+                'Administrator'
+              }
             >
               MD
             </div>
 
-            {/* Logout button */}
+            {/* Logout */}
             <button
               type="button"
               onClick={logout}
@@ -307,9 +355,11 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Dynamic page content */}
+        {/* Dynamic module content */}
         <main className="mx-auto max-w-[1600px] p-5 md:p-8">
-          {renderPage()}
+          <Suspense fallback={<ModuleLoading />}>
+            {renderPage()}
+          </Suspense>
         </main>
       </div>
     </div>
