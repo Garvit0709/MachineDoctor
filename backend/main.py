@@ -1,4 +1,5 @@
-
+import os
+from dotenv import load_dotenv
 import io
 
 import pandas as pd
@@ -36,6 +37,37 @@ app = FastAPI(
     ),
     version="0.1.0",
 )
+load_dotenv()
+
+ENVIRONMENT = os.getenv(
+    "ENVIRONMENT", "development"
+).lower()
+
+FRONTEND_ORIGIN = os.getenv(
+    "FRONTEND_ORIGIN", ""
+).strip()
+
+LOCAL_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+]
+
+if ENVIRONMENT == "production":
+    if (
+        not FRONTEND_ORIGIN.startswith("https://")
+        or "*" in FRONTEND_ORIGIN
+    ):
+        raise RuntimeError(
+            "Production FRONTEND_ORIGIN must be "
+            "an explicit HTTPS origin."
+        )
+
+    allowed_origins = [FRONTEND_ORIGIN.rstrip("/")]
+
+else:
+    allowed_origins = LOCAL_ORIGINS
 
 app.state.limiter = limiter
 
@@ -50,12 +82,7 @@ app.include_router(auth_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
