@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 from fastapi import Depends
 from backend.auth_dependencies import get_current_admin
 from backend.database import get_db
-from backend.models import Motor, Bearing
+from backend.models import Motor, Bearing, DiagnosticSession
 from backend.schemas import (
     MotorCreate,
     MotorUpdate,
@@ -95,6 +95,7 @@ def get_motor(
     return find_motor(db, motor_id)
 
 
+
 @router.patch(
     "/{motor_id}",
     response_model=MotorRead,
@@ -106,14 +107,29 @@ def update_motor(
 ):
     motor = find_motor(db, motor_id)
 
-    changes = payload.model_dump(exclude_unset=True)
+    changes = payload.model_dump(
+        exclude_unset=True
+    )
 
     for field, value in changes.items():
         setattr(motor, field, value)
 
-    db.commit()
+    try:
+        db.commit()
+
+    except IntegrityError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Motor update conflicts with "
+                "an existing database constraint."
+            ),
+        ) from exc
 
     return find_motor(db, motor_id)
+
 
 
 @router.delete(
@@ -126,8 +142,37 @@ def delete_motor(
 ):
     motor = find_motor(db, motor_id)
 
-    db.delete(motor)
-    db.commit()
+    # Block deletion when diagnostic history exists.
+    existing_session = db.scalar(
+        select(DiagnosticSession.id)
+        .where(DiagnosticSession.motor_id == motor_id)
+        .limit(1)
+    )
+
+    if existing_session is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Cannot delete this motor because "
+                "diagnostic history exists. "
+                "Historical AURA records must be preserved."
+            ),
+        )
+
+    try:
+        db.delete(motor)
+        db.commit()
+
+    except IntegrityError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Cannot delete this motor because "
+                "related database records prevent deletion."
+            ),
+        ) from exc
 
 
 @router.post(

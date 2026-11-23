@@ -8,8 +8,8 @@ from sqlalchemy.pool import StaticPool
 from backend import auth_service
 from backend.database import Base, get_db
 from backend.main import app
-from backend.models import Administrator
-
+from backend.models import Administrator 
+from backend.models import DiagnosticSession
 
 
 @pytest.fixture
@@ -198,3 +198,55 @@ def test_invalid_rpm(client):
     )
 
     assert response.status_code == 422, response.text
+def test_motor_with_diagnostic_history_cannot_be_deleted(
+    client,
+):
+    created = client.post(
+        "/api/motors",
+        json=sample_motor(),
+    )
+
+    assert created.status_code == 201, created.text
+
+    motor_id = created.json()["id"]
+
+    # Obtain the isolated database session from the
+    # existing test dependency override.
+    override = client.app.dependency_overrides[get_db]
+
+    generator = override()
+    db: Session = next(generator)
+
+    try:
+        session = DiagnosticSession(
+            motor_id=motor_id,
+            bearing_id=None,
+            run_id="test_run",
+            recording_name="test.csv",
+            data_source="synthetic",
+            model_name="test_model",
+            model_version="0.1",
+            total_windows=0,
+            normal_count=0,
+            warning_count=0,
+            unknown_count=0,
+        )
+
+        db.add(session)
+        db.commit()
+
+    finally:
+        generator.close()
+
+    response = client.delete(
+        f"/api/motors/{motor_id}"
+    )
+
+    assert response.status_code == 409, response.text
+
+    # The motor must still exist.
+    remaining = client.get(
+        f"/api/motors/{motor_id}"
+    )
+
+    assert remaining.status_code == 200
