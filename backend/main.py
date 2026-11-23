@@ -2,6 +2,7 @@ from fastapi import File, HTTPException, UploadFile
 from backend.diagnostic_router import router as diagnostic_router
 import io
 import pandas as pd
+from backend.auth_router import router as auth_router
 from backend.motor_router import router as motor_router
 from backend.aura_contract import AURAInputError
 from backend.aura_inference import diagnose_feature_sequence
@@ -26,6 +27,7 @@ app = FastAPI(
 )
 app.include_router(motor_router)
 app.include_router(diagnostic_router)
+app.include_router(auth_router)
 
 # Local development frontend origins only.
 app.add_middleware(
@@ -38,7 +40,7 @@ app.add_middleware(
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 
