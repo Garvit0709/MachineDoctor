@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
-
+from fastapi import Depends
+from backend.auth_dependencies import get_current_admin
 from backend.database import get_db
 from backend.models import Motor, Bearing
 from backend.schemas import (
@@ -15,10 +16,13 @@ from backend.schemas import (
 )
 
 
+
 router = APIRouter(
     prefix="/api/motors",
     tags=["Motor Registry"],
+    dependencies=[Depends(get_current_admin)],
 )
+
 
 
 def find_motor(db: Session, motor_id: int):

@@ -26,7 +26,7 @@ def test_access_token_round_trip(monkeypatch):
     monkeypatch.setattr(
         auth_service,
         "JWT_SECRET_KEY",
-        "test-secret-for-unit-tests-only",
+        "machinedoctor-unit-test-secret-at-least-32-bytes",
     )
 
     token = auth_service.create_access_token(7)

@@ -1,4 +1,4 @@
-
+from backend.auth_dependencies import get_current_admin
 import io
 
 import pandas as pd
@@ -26,10 +26,13 @@ from backend.diagnostic_history import (
 )
 
 
+
 router = APIRouter(
     prefix="/api/diagnostic-sessions",
     tags=["Diagnostic History"],
+    dependencies=[Depends(get_current_admin)],
 )
+
 
 MAX_FEATURE_BYTES = 2 * 1024 * 1024
 

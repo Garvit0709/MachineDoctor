@@ -15,7 +15,8 @@ from backend.signal_processing import (
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
+from fastapi import Depends
+from backend.auth_dependencies import get_current_admin
 
 app = FastAPI(
     title="MachineDoctor API",
@@ -119,7 +120,10 @@ async def analyze_signal(file: UploadFile = File(...)):
 MAX_FEATURE_FILE_BYTES = 2 * 1024 * 1024
 
 
-@app.post("/api/aura/diagnose")
+@app.post(
+    "/api/aura/diagnose",
+    dependencies=[Depends(get_current_admin)],
+)
 async def diagnose_aura(
     file: UploadFile = File(...),
 ):
