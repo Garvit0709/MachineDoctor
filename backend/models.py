@@ -168,10 +168,13 @@ class DiagnosticSession(Base):
     )
 
     bearing_id: Mapped[int | None] = mapped_column(
-        ForeignKey("bearings.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
+    ForeignKey(
+        "bearings.id",
+        ondelete="RESTRICT",
+    ),
+    nullable=True,
+    index=True,
+)
 
     run_id: Mapped[str] = mapped_column(
         String(100), nullable=False
