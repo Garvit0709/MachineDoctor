@@ -1,0 +1,27 @@
+{
+  "model_name": "aura_v01_synthetic",
+  "model_version": "aura-v0.1",
+  "schema_version": "1.0",
+  "created_at": "2026-11-22T07:29:13.323431+00:00",
+  "training_source": "synthetic_healthy_training",
+  "calibration_source": "synthetic_healthy_calibration_familiar_only_run_level",
+  "feature_columns": [
+    "rms",
+    "std",
+    "peak_to_peak",
+    "crest_factor",
+    "kurtosis",
+    "dominant_frequency",
+    "spectral_centroid"
+  ],
+  "condition_columns": [
+    "rpm",
+    "rpm_acceleration"
+  ],
+  "alpha": 0.3,
+  "memory_window": 10,
+  "min_history": 3,
+  "uncertainty_threshold": 2.1906538890012697,
+  "persistence_threshold": 1.2838,
+  "sha256": "7aae55490951afe685c116b6744da1b04fdb4b816634008f196e9e3ce4ba374e"
+}
