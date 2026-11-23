@@ -7,6 +7,10 @@ from backend.motor_router import router as motor_router
 from backend.aura_contract import AURAInputError
 from backend.aura_inference import diagnose_feature_sequence
 from backend.aura_model_store import AURAModelError
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+
+from backend.auth_router import limiter
 from backend.signal_processing import (
     MAX_FILE_BYTES,
     SignalValidationError,
@@ -25,6 +29,12 @@ app = FastAPI(
         "powered by the experimental AURA algorithm."
     ),
     version="0.1.0",
+)
+app.state.limiter = limiter
+
+app.add_exception_handler(
+    RateLimitExceeded,
+    _rate_limit_exceeded_handler,
 )
 app.include_router(motor_router)
 app.include_router(diagnostic_router)

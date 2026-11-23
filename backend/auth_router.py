@@ -1,6 +1,8 @@
 
 from typing import Annotated
-
+from fastapi import Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -14,6 +16,10 @@ from backend.auth_service import (
 from backend.database import get_db
 from backend.models import Administrator
 
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[],
+)
 
 router = APIRouter(
     prefix="/api/auth",
@@ -47,7 +53,9 @@ class AdministratorResponse(BaseModel):
     "/login",
     response_model=TokenResponse,
 )
+@limiter.limit("5/15minutes")
 def administrator_login(
+    request: Request,
     payload: LoginRequest,
     db: Annotated[Session, Depends(get_db)],
 ):
