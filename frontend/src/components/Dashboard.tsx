@@ -1,3 +1,4 @@
+import ModuleErrorBoundary from './ModuleErrorBoundary'
 
 import { lazy, Suspense, useState } from 'react'
 
@@ -243,7 +244,10 @@ export default function Dashboard() {
             aria-label="Close menu"
           />
 
-          <aside className="relative z-10 flex h-full w-72 flex-col bg-[#111C2D]">
+          <aside
+  id="machinedoctor-mobile-navigation"
+  className="relative z-10 flex h-full w-72 max-w-[85vw] flex-col bg-[#111C2D]"
+>
             {renderSidebar(false)}
           </aside>
         </div>
@@ -286,14 +290,16 @@ export default function Dashboard() {
 
           {/* Left header */}
           <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              className="text-slate-300 lg:hidden"
-              aria-label="Open navigation"
-            >
-              <Menu size={24} />
-            </button>
+           <button
+  type="button"
+  onClick={() => setMobileOpen(true)}
+  className="rounded-lg p-2 text-slate-300 hover:bg-slate-800 lg:hidden"
+  aria-label="Open navigation"
+  aria-expanded={mobileOpen}
+  aria-controls="machinedoctor-mobile-navigation"
+>
+  <Menu size={24} />
+</button>
 
             <div>
               <p className="text-xs text-slate-500">
@@ -357,10 +363,15 @@ export default function Dashboard() {
 
         {/* Dynamic module content */}
         <main className="mx-auto max-w-[1600px] p-5 md:p-8">
-          <Suspense fallback={<ModuleLoading />}>
-            {renderPage()}
-          </Suspense>
-        </main>
+  <ModuleErrorBoundary
+    key={activePage}
+    resetKey={activePage}
+  >
+    <Suspense fallback={<ModuleLoading />}>
+      {renderPage()}
+    </Suspense>
+  </ModuleErrorBoundary>
+</main>
       </div>
     </div>
   )
