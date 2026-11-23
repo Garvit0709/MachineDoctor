@@ -1,19 +1,35 @@
 
-export type AURAState = 'NORMAL' | 'WARNING' | 'UNKNOWN'
+import { apiFetch } from './apiClient'
 
-export type AURAPrediction = {
+export type AURAState =
+  | 'NORMAL'
+  | 'WARNING'
+  | 'UNKNOWN'
+
+export interface AURAPrediction {
   run_id: string
   time_start: number
   time_end: number
   state: AURAState
-  reason: string
-  persistent_score: number
-  instantaneous_score: number
-  uncertainty_distance: number
-  memory_size: number
+  reason: string | null
+  persistent_score: number | null
+  instantaneous_score: number | null
+  uncertainty_distance: number | null
+  memory_size: number | null
 }
 
-export type AURAResponse = {
+export interface AURAStateCounts {
+  NORMAL: number
+  WARNING: number
+  UNKNOWN: number
+}
+
+export interface AURAThresholds {
+  uncertainty: number
+  persistence: number
+}
+
+export interface AURADiagnosticResult {
   application: string
   algorithm: string
   model_name: string
@@ -21,28 +37,73 @@ export type AURAResponse = {
   data_scope: string
   run_id: string
   total_windows: number
-  state_counts: Record<AURAState, number>
-  thresholds: {
-    uncertainty: number
-    persistence: number
-  }
+  state_counts: AURAStateCounts
+  thresholds: AURAThresholds
   predictions: AURAPrediction[]
   limitations: string
 }
 
-const API_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  'http://127.0.0.1:8000'
+// Preserve the type expected by AURAIntelligence.tsx.
+export type AURAResponse = AURADiagnosticResult
+
+async function parseApiError(
+  response: Response,
+): Promise<string> {
+  const fallback = `AURA request failed (${response.status})`
+
+  try {
+    const body: unknown = await response.json()
+
+    if (
+      typeof body === 'object' &&
+      body !== null &&
+      'detail' in body
+    ) {
+      const detail = body.detail
+
+      if (typeof detail === 'string') {
+        return detail
+      }
+
+      if (Array.isArray(detail)) {
+        return detail
+          .map((item: unknown) => {
+            if (
+              typeof item === 'object' &&
+              item !== null &&
+              'msg' in item &&
+              typeof item.msg === 'string'
+            ) {
+              return item.msg
+            }
+
+            return 'Invalid input'
+          })
+          .join('; ')
+      }
+    }
+  } catch {
+    // Preserve the HTTP status fallback.
+  }
+
+  return fallback
+}
 
 export async function diagnoseAURA(
   file: File,
   signal?: AbortSignal,
 ): Promise<AURAResponse> {
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    throw new Error(
+      'Only CSV feature files are supported.',
+    )
+  }
+
   const formData = new FormData()
   formData.append('file', file)
 
-  const response = await fetch(
-    `${API_URL}/api/aura/diagnose`,
+  const response = await apiFetch(
+    '/api/aura/diagnose',
     {
       method: 'POST',
       body: formData,
@@ -51,35 +112,14 @@ export async function diagnoseAURA(
   )
 
   if (!response.ok) {
-    let message = `AURA diagnosis failed (${response.status})`
-
-    try {
-      const body: unknown = await response.json()
-      if (
-        typeof body === 'object' &&
-        body !== null &&
-        'detail' in body &&
-        typeof body.detail === 'string'
-      ) {
-        message = body.detail
-      }
-    } catch {
-      // Keep HTTP error message.
-    }
-
-    throw new Error(message)
+    throw new Error(
+      await parseApiError(response),
+    )
   }
 
-  const result: AURAResponse = await response.json()
+  return response.json() as Promise<AURAResponse>
+}
 
-  if (
-    result.algorithm !== 'AURA' ||
-    !Array.isArray(result.predictions) ||
-    !result.thresholds ||
-    !result.state_counts
-  ) {
-    throw new Error('Invalid AURA response.')
-  }
-
-  return result
+export const auraApi = {
+  diagnose: diagnoseAURA,
 }

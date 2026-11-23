@@ -1,80 +1,55 @@
 
-export type Bearing = {
+import { apiFetch } from './apiClient'
+
+export interface Bearing {
   id: number
   motor_id: number
   bearing_code: string
   position: string
   bearing_type: string | null
-  manufacturer: string | null
-  model_number: string | null
-  notes: string | null
-  created_at: string
+  created_at?: string
 }
 
-export type Motor = {
+export interface Motor {
   id: number
   motor_code: string
   name: string
+  manufacturer: string | null
   location: string | null
   motor_type: string | null
-  manufacturer: string | null
   rated_rpm: number | null
   rated_power_kw: number | null
-  operational_status: string
   notes: string | null
-  created_at: string
+  operational_status: string
   bearings: Bearing[]
+  created_at?: string
 }
 
-export type MotorCreate = {
+export interface MotorCreate {
   motor_code: string
   name: string
+  manufacturer?: string | null
   location?: string | null
   motor_type?: string | null
-  manufacturer?: string | null
   rated_rpm?: number | null
   rated_power_kw?: number | null
   notes?: string | null
-}
-
-export type MotorUpdate = Partial<
-  Omit<MotorCreate, 'motor_code'>
-> & {
   operational_status?: string
 }
 
-export type BearingCreate = {
+export type MotorUpdate = Partial<MotorCreate>
+
+export interface BearingCreate {
   bearing_code: string
   position: string
   bearing_type?: string | null
-  manufacturer?: string | null
-  model_number?: string | null
-  notes?: string | null
 }
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ??
-  'http://127.0.0.1:8000'
 
 async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  let response: Response
-
-  try {
-    response = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    })
-  } catch {
-    throw new Error(
-      'Cannot connect to MachineDoctor backend. Check FastAPI.',
-    )
-  }
+  const response = await apiFetch(path, options)
 
   if (!response.ok) {
     let message = `Request failed (${response.status})`
@@ -87,12 +62,29 @@ async function request<T>(
         body !== null &&
         'detail' in body
       ) {
-        if (typeof body.detail === 'string') {
-          message = body.detail
+        const detail = body.detail
+
+        if (typeof detail === 'string') {
+          message = detail
+        } else if (Array.isArray(detail)) {
+          message = detail
+            .map((item: unknown) => {
+              if (
+                typeof item === 'object' &&
+                item !== null &&
+                'msg' in item &&
+                typeof item.msg === 'string'
+              ) {
+                return item.msg
+              }
+
+              return 'Invalid input'
+            })
+            .join('; ')
         }
       }
     } catch {
-      // Keep HTTP status message.
+      // Keep the HTTP status fallback.
     }
 
     throw new Error(message)
@@ -106,31 +98,85 @@ async function request<T>(
 }
 
 export const motorApi = {
-  list: () => request<Motor[]>('/api/motors'),
+  list: (signal?: AbortSignal) =>
+    request<Motor[]>(
+      '/api/motors',
+      { signal },
+    ),
 
-  get: (id: number) =>
-    request<Motor>(`/api/motors/${id}`),
+  get: (
+    motorId: number,
+    signal?: AbortSignal,
+  ) =>
+    request<Motor>(
+      `/api/motors/${motorId}`,
+      { signal },
+    ),
 
-  create: (data: MotorCreate) =>
-    request<Motor>('/api/motors', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  create: (payload: MotorCreate) =>
+    request<Motor>(
+      '/api/motors',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      },
+    ),
 
-  update: (id: number, data: MotorUpdate) =>
-    request<Motor>(`/api/motors/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
+  update: (
+    motorId: number,
+    payload: MotorUpdate,
+  ) =>
+    request<Motor>(
+      `/api/motors/${motorId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      },
+    ),
 
-  remove: (id: number) =>
-    request<void>(`/api/motors/${id}`, {
-      method: 'DELETE',
-    }),
+  remove: (motorId: number) =>
+    request<void>(
+      `/api/motors/${motorId}`,
+      {
+        method: 'DELETE',
+      },
+    ),
 
-  addBearing: (motorId: number, data: BearingCreate) =>
-    request<Bearing>(`/api/motors/${motorId}/bearings`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  delete: (motorId: number) =>
+    request<void>(
+      `/api/motors/${motorId}`,
+      {
+        method: 'DELETE',
+      },
+    ),
+
+  addBearing: (
+    motorId: number,
+    payload: BearingCreate,
+  ) =>
+    request<Bearing>(
+      `/api/motors/${motorId}/bearings`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      },
+    ),
+
+  listBearings: (
+    motorId: number,
+    signal?: AbortSignal,
+  ) =>
+    request<Bearing[]>(
+      `/api/motors/${motorId}/bearings`,
+      { signal },
+    ),
 }

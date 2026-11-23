@@ -1,8 +1,10 @@
 
 import { useState } from 'react'
-import DiagnosticReports from './DiagnosticReports'
+import { useAuth } from '../auth/useAuth'
+
 import AURAIntelligence from './AURAIntelligence'
 import BackendStatus from './BackendStatus'
+import DiagnosticReports from './DiagnosticReports'
 import LiveOverview from './LiveOverview'
 import MotorRegistry from './MotorRegistry'
 import SignalExplorer from './SignalExplorer'
@@ -17,6 +19,7 @@ import {
   Cpu,
   FileText,
   LayoutDashboard,
+  LogOut,
   Menu,
   Settings,
   X,
@@ -36,14 +39,16 @@ export default function Dashboard() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  const { administrator, logout } = useAuth()
+
   const selectPage = (page: string) => {
     setActivePage(page)
     setMobileOpen(false)
   }
 
-  // Sidebar navigation
   const renderSidebar = (isCollapsed: boolean) => (
     <>
+      {/* Application branding */}
       <div className="flex h-20 items-center justify-between border-b border-slate-800 px-5">
         <div className="flex items-center gap-3 overflow-hidden">
           <div className="shrink-0 rounded-xl bg-cyan-400/10 p-2.5 text-cyan-400">
@@ -55,6 +60,7 @@ export default function Dashboard() {
               <h1 className="text-lg font-bold tracking-tight">
                 MachineDoctor
               </h1>
+
               <p className="text-[10px] font-semibold tracking-[0.2em] text-cyan-400">
                 POWERED BY AURA
               </p>
@@ -72,6 +78,7 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* Navigation */}
       <nav
         className="space-y-1 px-3 py-6"
         aria-label="Main navigation"
@@ -98,11 +105,13 @@ export default function Dashboard() {
             }`}
           >
             <Icon size={19} className="shrink-0" />
+
             {!isCollapsed && <span>{name}</span>}
           </button>
         ))}
       </nav>
 
+      {/* AURA research information */}
       {!isCollapsed && (
         <div className="mt-auto border-t border-slate-800 p-5">
           <div className="rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-4">
@@ -110,6 +119,7 @@ export default function Dashboard() {
               <BrainCircuit size={16} />
               AURA v0.1
             </div>
+
             <p className="text-xs leading-5 text-slate-400">
               Experimental diagnostic algorithm.
               Scientific validation is ongoing.
@@ -120,11 +130,15 @@ export default function Dashboard() {
     </>
   )
 
-  // Placeholder for upcoming modules
+  // Placeholder for future modules
   const renderPlaceholder = () => (
     <section className="rounded-2xl border border-slate-800 bg-[#111C2D] p-8">
       <div className="mb-4 flex items-center gap-3">
-        <ArrowUpRight className="text-cyan-400" size={24} />
+        <ArrowUpRight
+          className="text-cyan-400"
+          size={24}
+        />
+
         <h2 className="text-2xl font-semibold">
           {activePage}
         </h2>
@@ -146,14 +160,13 @@ export default function Dashboard() {
     </section>
   )
 
-  // Page rendering
+  // Dynamic page rendering
   const renderPage = () => {
     switch (activePage) {
       case 'Overview':
-        return <LiveOverview onNavigate={selectPage} />
-
-        case 'Reports':
-  return <DiagnosticReports />
+        return (
+          <LiveOverview onNavigate={selectPage} />
+        )
 
       case 'Motor Registry':
         return <MotorRegistry />
@@ -164,6 +177,9 @@ export default function Dashboard() {
       case 'AURA Intelligence':
         return <AURAIntelligence />
 
+      case 'Reports':
+        return <DiagnosticReports />
+
       default:
         return renderPlaceholder()
     }
@@ -171,6 +187,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#0B1220] text-slate-100">
+
       {/* Mobile navigation */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -200,7 +217,9 @@ export default function Dashboard() {
           onClick={() => setCollapsed(!collapsed)}
           className="absolute -right-3 top-24 rounded-full border border-slate-700 bg-[#172337] p-1 text-slate-400 hover:text-white"
           aria-label={
-            collapsed ? 'Expand sidebar' : 'Collapse sidebar'
+            collapsed
+              ? 'Expand sidebar'
+              : 'Collapse sidebar'
           }
         >
           {collapsed ? (
@@ -219,6 +238,8 @@ export default function Dashboard() {
       >
         {/* Header */}
         <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-800 bg-[#0B1220]/95 px-5 backdrop-blur md:px-8">
+
+          {/* Left header */}
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -233,26 +254,56 @@ export default function Dashboard() {
               <p className="text-xs text-slate-500">
                 MachineDoctor / Workspace
               </p>
+
               <h2 className="text-xl font-semibold">
                 {activePage}
               </h2>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Right header */}
+          <div className="flex items-center gap-3 md:gap-4">
+
+            {/* Backend connection */}
             <div className="hidden sm:block">
               <BackendStatus />
             </div>
 
+            {/* Research prototype badge */}
             <span className="hidden rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-xs font-medium text-cyan-300 xl:inline-flex">
               RESEARCH PROTOTYPE
             </span>
 
-            <Bell size={20} className="text-slate-400" />
+            {/* Notifications icon */}
+            <Bell
+              size={20}
+              className="hidden text-slate-400 sm:block"
+              aria-hidden="true"
+            />
 
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-400/10 text-sm font-bold text-cyan-300">
+            {/* Administrator username */}
+            <span className="hidden max-w-32 truncate text-sm text-slate-400 md:inline">
+              {administrator?.username}
+            </span>
+
+            {/* Administrator avatar */}
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-sm font-bold text-cyan-300"
+              title={administrator?.username ?? 'Administrator'}
+            >
               MD
             </div>
+
+            {/* Logout button */}
+            <button
+              type="button"
+              onClick={logout}
+              title="Sign out"
+              aria-label="Sign out"
+              className="rounded-xl border border-slate-700 p-2.5 text-slate-400 transition hover:border-red-400/30 hover:bg-red-400/10 hover:text-red-300"
+            >
+              <LogOut size={18} />
+            </button>
           </div>
         </header>
 

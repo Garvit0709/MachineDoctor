@@ -295,10 +295,14 @@ export default function AURAIntelligence() {
                         <StatusBadge state={prediction.state} />
                       </td>
                       <td className="px-5 py-4">
-                        {prediction.persistent_score.toFixed(3)}
+                       {prediction.persistent_score !== null
+  ? prediction.persistent_score.toFixed(3)
+  : '—'}
                       </td>
                       <td className="px-5 py-4">
-                        {prediction.uncertainty_distance.toFixed(3)}
+                        {prediction.uncertainty_distance !== null
+  ? prediction.uncertainty_distance.toFixed(3)
+  : '—'}
                       </td>
                       <td className="px-5 py-4 text-slate-400">
                         {prediction.reason}

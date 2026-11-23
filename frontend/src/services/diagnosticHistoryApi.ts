@@ -1,7 +1,12 @@
 
-export type DiagnosticState = 'NORMAL' | 'WARNING' | 'UNKNOWN'
+import { apiFetch } from './apiClient'
 
-export type DiagnosticSessionSummary = {
+export type DiagnosticState =
+  | 'NORMAL'
+  | 'WARNING'
+  | 'UNKNOWN'
+
+export interface DiagnosticSessionSummary {
   id: number
   motor_id: number
   bearing_id: number | null
@@ -16,7 +21,7 @@ export type DiagnosticSessionSummary = {
   created_at: string
 }
 
-export type DiagnosticWindow = {
+export interface DiagnosticWindow {
   window_index: number
   time_start: number
   time_end: number
@@ -28,7 +33,7 @@ export type DiagnosticWindow = {
   memory_size: number | null
 }
 
-export type DiagnosticSessionDetail = {
+export interface DiagnosticSessionDetail {
   id: number
   motor_id: number
   bearing_id: number | null
@@ -43,15 +48,11 @@ export type DiagnosticSessionDetail = {
   predictions: DiagnosticWindow[]
 }
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ??
-  'http://127.0.0.1:8000'
-
 async function request<T>(
   path: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await apiFetch(path, {
     signal,
   })
 
@@ -64,13 +65,31 @@ async function request<T>(
       if (
         typeof body === 'object' &&
         body !== null &&
-        'detail' in body &&
-        typeof body.detail === 'string'
+        'detail' in body
       ) {
-        message = body.detail
+        const detail = body.detail
+
+        if (typeof detail === 'string') {
+          message = detail
+        } else if (Array.isArray(detail)) {
+          message = detail
+            .map((item: unknown) => {
+              if (
+                typeof item === 'object' &&
+                item !== null &&
+                'msg' in item &&
+                typeof item.msg === 'string'
+              ) {
+                return item.msg
+              }
+
+              return 'Invalid input'
+            })
+            .join('; ')
+        }
       }
     } catch {
-      // Retain HTTP status message.
+      // Keep the HTTP status fallback.
     }
 
     throw new Error(message)
@@ -80,7 +99,10 @@ async function request<T>(
 }
 
 export const diagnosticHistoryApi = {
-  list: (motorId?: number, signal?: AbortSignal) => {
+  list: (
+    motorId?: number,
+    signal?: AbortSignal,
+  ) => {
     const query =
       motorId !== undefined
         ? `?motor_id=${encodeURIComponent(motorId)}`
@@ -92,9 +114,12 @@ export const diagnosticHistoryApi = {
     )
   },
 
-  get: (id: number, signal?: AbortSignal) =>
+  get: (
+    sessionId: number,
+    signal?: AbortSignal,
+  ) =>
     request<DiagnosticSessionDetail>(
-      `/api/diagnostic-sessions/${id}`,
+      `/api/diagnostic-sessions/${sessionId}`,
       signal,
     ),
 }

@@ -1,8 +1,24 @@
 
-import Dashboard from './components/Dashboard'
+import { AuthProvider } from './auth/AuthContext'
+import { useAuth } from './auth/useAuth'
 
-function App() {
+import Dashboard from './components/Dashboard'
+import Login from './components/Login'
+
+function ApplicationContent() {
+  const { isAuthenticated } = useAuth()
+
+  if (!isAuthenticated) {
+    return <Login />
+  }
+
   return <Dashboard />
 }
 
-export default App
+export default function App() {
+  return (
+    <AuthProvider>
+      <ApplicationContent />
+    </AuthProvider>
+  )
+}
