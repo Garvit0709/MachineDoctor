@@ -1,26 +1,32 @@
-from fastapi import File, HTTPException, UploadFile
-from backend.diagnostic_router import router as diagnostic_router
+
 import io
+
 import pandas as pd
+
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from backend.auth_dependencies import get_current_admin
+from backend.auth_router import limiter
 from backend.auth_router import router as auth_router
-from backend.motor_router import router as motor_router
 from backend.aura_contract import AURAInputError
 from backend.aura_inference import diagnose_feature_sequence
 from backend.aura_model_store import AURAModelError
-from slowapi.errors import RateLimitExceeded
-from slowapi import _rate_limit_exceeded_handler
-
-from backend.auth_router import limiter
+from backend.diagnostic_router import router as diagnostic_router
+from backend.motor_router import router as motor_router
 from backend.signal_processing import (
     MAX_FILE_BYTES,
     SignalValidationError,
     analyze_vibration_csv,
 )
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from fastapi import Depends
-from backend.auth_dependencies import get_current_admin
+from backend.upload_security import (
+    FEATURE_UPLOAD_LIMIT,
+    validate_csv_upload,
+)
+
 
 app = FastAPI(
     title="MachineDoctor API",
@@ -30,17 +36,18 @@ app = FastAPI(
     ),
     version="0.1.0",
 )
+
 app.state.limiter = limiter
 
 app.add_exception_handler(
     RateLimitExceeded,
     _rate_limit_exceeded_handler,
 )
+
 app.include_router(motor_router)
 app.include_router(diagnostic_router)
 app.include_router(auth_router)
 
-# Local development frontend origins only.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -93,8 +100,17 @@ def capabilities():
         },
     }
 
+
 @app.post("/api/signals/analyze")
-async def analyze_signal(file: UploadFile = File(...)):
+async def analyze_signal(
+    file: UploadFile = File(...),
+):
+    """
+    Analyze raw vibration CSV data.
+
+    This endpoint is separate from AURA feature inference.
+    """
+
     if not file.filename:
         raise HTTPException(
             status_code=400,
@@ -127,8 +143,6 @@ async def analyze_signal(file: UploadFile = File(...)):
     finally:
         await file.close()
 
-MAX_FEATURE_FILE_BYTES = 2 * 1024 * 1024
-
 
 @app.post(
     "/api/aura/diagnose",
@@ -138,40 +152,28 @@ async def diagnose_aura(
     file: UploadFile = File(...),
 ):
     """
-    Diagnose one precomputed feature-window CSV.
+    Diagnose one compatible precomputed feature CSV.
 
-    Experimental endpoint for local research use.
+    Experimental AURA v0.1 synthetic-data endpoint.
     """
 
-    if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="Filename is required.",
-        )
-
-    if not file.filename.lower().endswith(".csv"):
-        raise HTTPException(
-            status_code=415,
-            detail="Only CSV files are supported.",
-        )
-
     try:
-        content = await file.read(
-            MAX_FEATURE_FILE_BYTES + 1
+        content = await validate_csv_upload(
+            file,
+            max_size=FEATURE_UPLOAD_LIMIT,
         )
-
-        if len(content) > MAX_FEATURE_FILE_BYTES:
-            raise HTTPException(
-                status_code=413,
-                detail="Feature CSV exceeds 2 MB.",
-            )
 
         try:
             features = pd.read_csv(
                 io.BytesIO(content),
                 encoding="utf-8-sig",
             )
-        except (pd.errors.ParserError, UnicodeError) as exc:
+
+        except (
+            pd.errors.ParserError,
+            UnicodeError,
+            ValueError,
+        ) as exc:
             raise HTTPException(
                 status_code=422,
                 detail="Unable to parse feature CSV.",

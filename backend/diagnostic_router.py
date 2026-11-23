@@ -1,4 +1,4 @@
-from backend.auth_dependencies import get_current_admin
+
 import io
 
 import pandas as pd
@@ -13,18 +13,21 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from backend.database import get_db
+from backend.auth_dependencies import get_current_admin
 from backend.aura_contract import AURAInputError
 from backend.aura_inference import diagnose_feature_sequence
 from backend.aura_model_store import AURAModelError
-
+from backend.database import get_db
 from backend.diagnostic_history import (
     DiagnosticHistoryError,
     get_diagnostic_session,
     list_diagnostic_sessions,
     save_diagnostic_result,
 )
-
+from backend.upload_security import (
+    FEATURE_UPLOAD_LIMIT,
+    validate_csv_upload,
+)
 
 
 router = APIRouter(
@@ -34,9 +37,6 @@ router = APIRouter(
 )
 
 
-MAX_FEATURE_BYTES = 2 * 1024 * 1024
-
-
 @router.post("", status_code=201)
 async def create_diagnostic_session(
     motor_id: int = Form(..., gt=0),
@@ -44,32 +44,24 @@ async def create_diagnostic_session(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    if not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="Filename is required.",
-        )
+    """
+    Run AURA inference and persist diagnostic results.
 
-    if not file.filename.lower().endswith(".csv"):
-        raise HTTPException(
-            status_code=415,
-            detail="Only feature CSV files are supported.",
-        )
+    Requires an authenticated administrator.
+    """
 
     try:
-        content = await file.read(MAX_FEATURE_BYTES + 1)
-
-        if len(content) > MAX_FEATURE_BYTES:
-            raise HTTPException(
-                status_code=413,
-                detail="Feature CSV exceeds 2 MB.",
-            )
+        content = await validate_csv_upload(
+            file,
+            max_size=FEATURE_UPLOAD_LIMIT,
+        )
 
         try:
             features = pd.read_csv(
                 io.BytesIO(content),
                 encoding="utf-8-sig",
             )
+
         except (
             pd.errors.ParserError,
             UnicodeError,
@@ -80,7 +72,6 @@ async def create_diagnostic_session(
                 detail="Unable to parse feature CSV.",
             ) from exc
 
-        # Actual AURA inference, not a demonstration result.
         result = diagnose_feature_sequence(features)
 
         session = save_diagnostic_result(
