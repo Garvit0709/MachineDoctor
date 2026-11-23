@@ -11,8 +11,14 @@ from backend.models import (
     DiagnosticWindow,
 )
 
+from backend.diagnostic_validation import (
+    DiagnosticValidationError,
+    validate_diagnostic_result,
+)
+
 
 class DiagnosticHistoryError(ValueError):
+    """Raised when diagnostic history cannot be saved."""
     pass
 
 
@@ -21,6 +27,10 @@ def validate_equipment(
     motor_id: int,
     bearing_id: int | None,
 ):
+    """
+    Validate the selected motor and optional bearing.
+    """
+
     motor = db.get(Motor, motor_id)
 
     if motor is None:
@@ -29,6 +39,7 @@ def validate_equipment(
         )
 
     if bearing_id is not None:
+
         bearing = db.get(Bearing, bearing_id)
 
         if bearing is None:
@@ -49,6 +60,7 @@ def safe_number(value):
     Convert finite numeric scores to float.
     Preserve unavailable measurements as None.
     """
+
     if value is None:
         return None
 
@@ -71,16 +83,18 @@ def save_diagnostic_result(
     """
     Persist one complete AURA diagnostic session.
 
-    The caller supplies a trusted result generated
-    by the AURA inference service.
+    Validates equipment and predictions before writing.
+    Rolls back the transaction if persistence fails.
     """
 
+    # Validate equipment association.
     validate_equipment(
         db,
         motor_id,
         bearing_id,
     )
 
+    # Restrict current model to supported synthetic features.
     if result.get("data_scope") != (
         "compatible_synthetic_features_only"
     ):
@@ -88,9 +102,19 @@ def save_diagnostic_result(
             "Unsupported diagnostic data scope."
         )
 
+    # Preserve the existing diagnostic history error contract.
+    try:
+        validate_diagnostic_result(result)
+
+    except DiagnosticValidationError as exc:
+        raise DiagnosticHistoryError(
+            str(exc)
+        ) from exc
+
     predictions = result["predictions"]
     counts = result["state_counts"]
 
+    # Additional consistency checks.
     if not predictions:
         raise DiagnosticHistoryError(
             "Cannot save an empty diagnostic sequence."
@@ -106,7 +130,11 @@ def save_diagnostic_result(
             prediction["state"] == state
             for prediction in predictions
         )
-        for state in ("NORMAL", "WARNING", "UNKNOWN")
+        for state in (
+            "NORMAL",
+            "WARNING",
+            "UNKNOWN",
+        )
     }
 
     if actual_counts != {
@@ -117,6 +145,7 @@ def save_diagnostic_result(
             "Diagnostic state counts are inconsistent."
         )
 
+    # Create the diagnostic session.
     session = DiagnosticSession(
         motor_id=motor_id,
         bearing_id=bearing_id,
@@ -131,11 +160,17 @@ def save_diagnostic_result(
         unknown_count=actual_counts["UNKNOWN"],
     )
 
+    # Create all diagnostic windows.
     for index, prediction in enumerate(predictions):
+
         window = DiagnosticWindow(
             window_index=index,
-            time_start=float(prediction["time_start"]),
-            time_end=float(prediction["time_end"]),
+            time_start=float(
+                prediction["time_start"]
+            ),
+            time_end=float(
+                prediction["time_end"]
+            ),
             state=prediction["state"],
             reason=prediction.get("reason"),
             persistent_score=safe_number(
@@ -156,10 +191,12 @@ def save_diagnostic_result(
 
         session.windows.append(window)
 
+    # Save the session and windows in one transaction.
     try:
         db.add(session)
         db.commit()
         db.refresh(session)
+
     except Exception:
         db.rollback()
         raise
@@ -171,6 +208,10 @@ def list_diagnostic_sessions(
     db: Session,
     motor_id: int | None = None,
 ):
+    """
+    Retrieve diagnostic sessions in descending date order.
+    """
+
     statement = select(DiagnosticSession)
 
     if motor_id is not None:
@@ -190,10 +231,18 @@ def get_diagnostic_session(
     db: Session,
     session_id: int,
 ):
+    """
+    Retrieve a diagnostic session and its windows.
+    """
+
     statement = (
         select(DiagnosticSession)
-        .options(selectinload(DiagnosticSession.windows))
-        .where(DiagnosticSession.id == session_id)
+        .options(
+            selectinload(DiagnosticSession.windows)
+        )
+        .where(
+            DiagnosticSession.id == session_id
+        )
     )
 
     return db.scalar(statement)
