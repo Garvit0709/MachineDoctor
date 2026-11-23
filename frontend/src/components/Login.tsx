@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 
 import { useAuth } from '../auth/useAuth'
+import CreatorCredit from './CreatorCredit'
 
 export default function Login() {
   const { login } = useAuth()
@@ -22,7 +23,9 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault()
 
     if (loading) return
@@ -46,6 +49,7 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0B1220] px-5 py-12 text-slate-100">
       <div className="w-full max-w-md">
+        {/* Application branding */}
         <div className="mb-10 flex items-center justify-center gap-3">
           <div className="rounded-xl bg-cyan-400/10 p-3 text-cyan-400">
             <Activity size={27} />
@@ -55,12 +59,14 @@ export default function Login() {
             <h1 className="text-2xl font-bold tracking-tight">
               MachineDoctor
             </h1>
+
             <p className="text-xs font-semibold tracking-[0.2em] text-cyan-400">
               POWERED BY AURA
             </p>
           </div>
         </div>
 
+        {/* Login card */}
         <div className="rounded-2xl border border-slate-800 bg-[#111C2D] p-8 shadow-2xl">
           <div className="mb-7 text-center">
             <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-cyan-400/10 text-cyan-400">
@@ -77,7 +83,10 @@ export default function Login() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-5"
+          >
             <div>
               <label
                 htmlFor="username"
@@ -149,7 +158,10 @@ export default function Login() {
                 role="alert"
                 className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300"
               >
-                <AlertCircle size={18} className="shrink-0" />
+                <AlertCircle
+                  size={18}
+                  className="shrink-0"
+                />
                 <span>{error}</span>
               </div>
             )}
@@ -161,16 +173,23 @@ export default function Login() {
             >
               <LockKeyhole size={18} />
 
-              {loading ? 'Signing in...' : 'Sign in securely'}
+              {loading
+                ? 'Signing in...'
+                : 'Sign in securely'}
             </button>
           </form>
         </div>
 
-        <p className="mt-8 text-center text-xs leading-6 text-slate-500">
-          MachineDoctor Research Prototype
-          {' · '}
-          Experimental motor-bearing diagnostics
-        </p>
+        {/* Creator branding */}
+        <div className="mt-8 flex flex-col items-center gap-4">
+          <CreatorCredit />
+
+          <p className="text-center text-xs leading-6 text-slate-500">
+            MachineDoctor Research Prototype
+            {' · '}
+            Experimental motor-bearing diagnostics
+          </p>
+        </div>
       </div>
     </div>
   )

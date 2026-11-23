@@ -1,10 +1,11 @@
-import ModuleErrorBoundary from './ModuleErrorBoundary'
 
 import { lazy, Suspense, useState } from 'react'
 
 import { useAuth } from '../auth/useAuth'
 
 import BackendStatus from './BackendStatus'
+import CreatorCredit from './CreatorCredit'
+import ModuleErrorBoundary from './ModuleErrorBoundary'
 
 import {
   Activity,
@@ -21,9 +22,6 @@ import {
   Settings,
   X,
 } from 'lucide-react'
-
-// Lazy-loaded application modules.
-// Each module is loaded when first requested.
 
 const LiveOverview = lazy(
   () => import('./LiveOverview')
@@ -54,7 +52,6 @@ const navigation = [
   { name: 'Settings', icon: Settings },
 ]
 
-// Loading state for lazily loaded modules.
 function ModuleLoading() {
   return (
     <div
@@ -65,10 +62,6 @@ function ModuleLoading() {
 
       <p className="text-sm font-medium text-slate-300">
         Loading MachineDoctor module...
-      </p>
-
-      <p className="mt-2 text-xs text-slate-500">
-        Preparing your workspace
       </p>
     </div>
   )
@@ -86,10 +79,8 @@ export default function Dashboard() {
     setMobileOpen(false)
   }
 
-  // Sidebar navigation.
   const renderSidebar = (isCollapsed: boolean) => (
     <>
-      {/* Application branding */}
       <div className="flex h-20 items-center justify-between border-b border-slate-800 px-5">
         <div className="flex items-center gap-3 overflow-hidden">
           <div className="shrink-0 rounded-xl bg-cyan-400/10 p-2.5 text-cyan-400">
@@ -119,7 +110,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Main navigation */}
       <nav
         className="space-y-1 px-3 py-6"
         aria-label="Main navigation"
@@ -145,21 +135,15 @@ export default function Dashboard() {
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
-            <Icon
-              size={19}
-              className="shrink-0"
-            />
-
-            {!isCollapsed && (
-              <span>{name}</span>
-            )}
+            <Icon size={19} className="shrink-0" />
+            {!isCollapsed && <span>{name}</span>}
           </button>
         ))}
       </nav>
 
-      {/* AURA research information */}
-      {!isCollapsed && (
-        <div className="mt-auto border-t border-slate-800 p-5">
+      {/* Research information and creator credit */}
+      {!isCollapsed ? (
+        <div className="mt-auto border-t border-slate-800 p-4">
           <div className="rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-4">
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-cyan-300">
               <BrainCircuit size={16} />
@@ -171,12 +155,19 @@ export default function Dashboard() {
               Scientific validation is ongoing.
             </p>
           </div>
+
+          <div className="mt-4 border-t border-slate-800 pt-4">
+            <CreatorCredit />
+          </div>
+        </div>
+      ) : (
+        <div className="mt-auto flex justify-center border-t border-slate-800 py-5">
+          <CreatorCredit compact />
         </div>
       )}
     </>
   )
 
-  // Placeholder for future modules.
   const renderPlaceholder = () => (
     <section className="rounded-2xl border border-slate-800 bg-[#111C2D] p-8">
       <div className="mb-4 flex items-center gap-3">
@@ -206,13 +197,10 @@ export default function Dashboard() {
     </section>
   )
 
-  // Render selected application module.
   const renderPage = () => {
     switch (activePage) {
       case 'Overview':
-        return (
-          <LiveOverview onNavigate={selectPage} />
-        )
+        return <LiveOverview onNavigate={selectPage} />
 
       case 'Motor Registry':
         return <MotorRegistry />
@@ -233,7 +221,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#0B1220] text-slate-100">
-
       {/* Mobile navigation */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -245,9 +232,9 @@ export default function Dashboard() {
           />
 
           <aside
-  id="machinedoctor-mobile-navigation"
-  className="relative z-10 flex h-full w-72 max-w-[85vw] flex-col bg-[#111C2D]"
->
+            id="machinedoctor-mobile-navigation"
+            className="relative z-10 flex h-full w-72 max-w-[85vw] flex-col bg-[#111C2D]"
+          >
             {renderSidebar(false)}
           </aside>
         </div>
@@ -287,19 +274,17 @@ export default function Dashboard() {
       >
         {/* Header */}
         <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-800 bg-[#0B1220]/95 px-5 backdrop-blur md:px-8">
-
-          {/* Left header */}
           <div className="flex items-center gap-4">
-           <button
-  type="button"
-  onClick={() => setMobileOpen(true)}
-  className="rounded-lg p-2 text-slate-300 hover:bg-slate-800 lg:hidden"
-  aria-label="Open navigation"
-  aria-expanded={mobileOpen}
-  aria-controls="machinedoctor-mobile-navigation"
->
-  <Menu size={24} />
-</button>
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              className="rounded-lg p-2 text-slate-300 hover:bg-slate-800 lg:hidden"
+              aria-label="Open navigation"
+              aria-expanded={mobileOpen}
+              aria-controls="machinedoctor-mobile-navigation"
+            >
+              <Menu size={24} />
+            </button>
 
             <div>
               <p className="text-xs text-slate-500">
@@ -312,43 +297,32 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Right header */}
           <div className="flex items-center gap-3 md:gap-4">
-
-            {/* Backend connection */}
             <div className="hidden sm:block">
               <BackendStatus />
             </div>
 
-            {/* Research prototype badge */}
             <span className="hidden rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-xs font-medium text-cyan-300 xl:inline-flex">
               RESEARCH PROTOTYPE
             </span>
 
-            {/* Notifications */}
             <Bell
               size={20}
               className="hidden text-slate-400 sm:block"
               aria-hidden="true"
             />
 
-            {/* Administrator username */}
             <span className="hidden max-w-32 truncate text-sm text-slate-400 md:inline">
               {administrator?.username}
             </span>
 
-            {/* Administrator avatar */}
             <div
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-sm font-bold text-cyan-300"
-              title={
-                administrator?.username ??
-                'Administrator'
-              }
+              title={administrator?.username ?? 'Administrator'}
             >
               MD
             </div>
 
-            {/* Logout */}
             <button
               type="button"
               onClick={logout}
@@ -363,15 +337,15 @@ export default function Dashboard() {
 
         {/* Dynamic module content */}
         <main className="mx-auto max-w-[1600px] p-5 md:p-8">
-  <ModuleErrorBoundary
-    key={activePage}
-    resetKey={activePage}
-  >
-    <Suspense fallback={<ModuleLoading />}>
-      {renderPage()}
-    </Suspense>
-  </ModuleErrorBoundary>
-</main>
+          <ModuleErrorBoundary
+            key={activePage}
+            resetKey={activePage}
+          >
+            <Suspense fallback={<ModuleLoading />}>
+              {renderPage()}
+            </Suspense>
+          </ModuleErrorBoundary>
+        </main>
       </div>
     </div>
   )
