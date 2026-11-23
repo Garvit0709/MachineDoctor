@@ -18,10 +18,12 @@ target_metadata = Base.metadata
 
 # Use the configured database URL rather than
 # placing credentials in alembic.ini.
+from sqlalchemy.engine import make_url
+
 config.set_main_option(
     "sqlalchemy.url",
-    database_url.render_as_string(
-        hide_password=False,
+    make_url(database_url).render_as_string(
+        hide_password=False
     ).replace("%", "%%"),
 )
 
